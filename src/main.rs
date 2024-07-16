@@ -1,4 +1,6 @@
 // use std::thread;
+use std::env;
+use serde_json::Value;
 use rand::prelude::SliceRandom;
 use rand::distributions::Uniform;
 use rand::distributions::{Distribution, Standard};
@@ -251,14 +253,15 @@ impl Zone_3D{
         vector1: &mut Vec<host>,
         time: usize,
         counter:usize,
-        no_to_do: usize
+        no_to_do: usize,
+        line_no: usize,
     ) {
         // Sort eviscerators by chronology
         eviscerators.sort_by_key(|ev| ev.chronology);
         vector1.sort_by(|a,b| a.origin_x.cmp(&b.origin_x));
         let mut processed_eviscerators = Vec::new(); // Vector to hold processed eviscerators
         // println!("Zone of the hosts here are ")
-        for line in 0..NO_OF_LINES[counter]{
+        for line in 0..line_no{
             let mut vector: Vec<&mut host> = vector1.iter_mut().filter(|host| !host.eviscerated && host.zone == self.zone && host.motile == 0).take(no_to_do).collect();
             for chronology in 0..=NO_OF_EVISCERATORS-1 {
                 let mut eviscerators_for_this_chronology = eviscerators
@@ -548,7 +551,7 @@ const LENGTH: usize =20; //How long do you want the simulation to be?
 //Infection/Colonization module
 // ------------Do only colonized hosts spread disease or do infected hosts spread
 const PERCENT_INF:f64 = 8.36/100.0;
-const TOTAL_NO_OF_HOSTS:f64 = 42000.0;
+const TOTAL_NO_OF_HOSTS:f64 = 7000.0;
 const HOST_0:usize = (PERCENT_INF*TOTAL_NO_OF_HOSTS) as usize; //8.36% of population infected 
 const COLONIZATION_SPREAD_MODEL:bool = true;
 const TIME_OR_CONTACT:bool = true; //true for time -> contact uses number of times infected to determine colonization
@@ -636,7 +639,8 @@ const EVISCERATE:bool = true;
 const EVISCERATE_ZONES:[usize;1] = [1]; //Zone in which evisceration takes place
 const EVISCERATE_DECAY:u8 = 5;
 const NO_OF_PROBES:[usize;1] = [28;1]; //no of probes per eviscerator
-const NO_OF_LINES:[usize;1] = [1;1];
+const LINE_NO: usize = 3;
+const NO_OF_LINES:[usize;1] = [LINE_NO;1];
 const NO_OF_EVISCERATORS:usize = 3;
 const EVISCERATOR_TO_HOST_PROBABILITY_DECAY:f64 = 0.25;   //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
 const CLEAN_EVISCERATORS:bool = false; //Be sure to set the hours when eviscerators are manually cleaned yourself (Might need to run simulation to figure out when evisceraors get  used at all)
@@ -1467,13 +1471,41 @@ fn main(){
     let mut faecal_collection:[u64;2] = [0,1];
     let mut zones:Vec<Zone_3D> = Vec::new();
 
+    //import no of lines
+    // Path to the JSON file
+    let file_path = "config.json";
+
+    // Check if the file exists
+    if !fs::metadata(file_path).map(|m| m.is_file()).unwrap_or(false) {
+        eprintln!("File {} does not exist.", file_path);
+        return;
+    }
+
+    // Read the JSON file
+    let contents = fs::read_to_string(file_path).expect("Failed to read file");
+
+    // Deserialize the JSON content
+    let v: Value = serde_json::from_str(&contents).expect("Failed to parse JSON");
+
+    // Extract the LINE_NO value, treating it as usize
+    let line_no: usize = match v.get("LINE_NO").and_then(Value::as_u64) {
+        Some(value) => value as usize,
+        None => {
+            eprintln!("Key 'LINE_NO' not found in the configuration.");
+            return;
+        }
+    };
+
+    println!("LINE_NO: {}", line_no);
+    // Now use line_no in your code...
+    // let line_no:usize =3;
     //Influx parameter
     let mut influx:bool = INFLUX;
     //Generate eviscerators
     let mut eviscerators:Vec<Eviscerator> = Vec::new();
     if EVISCERATE{
         for index in 0..EVISCERATE_ZONES.len(){
-            for set_no in 0..NO_OF_LINES[index]{
+            for set_no in 0..line_no{
                 for _ in 0..NO_OF_PROBES[index]{
                     for chronology in 0..NO_OF_EVISCERATORS{
                         //each struct you are pushing represents a probe
@@ -1550,8 +1582,10 @@ fn main(){
     // println!("NUMBER OF INFECTED hosts IS {}", vecc_into.len());
     //CSV FILE
     let filestring: String = format!("./output.csv");
-    if fs::metadata(&filestring).is_ok() {
-        fs::remove_file(&filestring).unwrap();
+    // Check if the file already exists
+    if fs::metadata(filestring.clone()).is_err() {
+        // If the file does not exist, create it
+        fs::File::create(filestring.clone());
     }
     // Open the file in append mode for writing
     let mut file = OpenOptions::new()
@@ -1590,11 +1624,11 @@ fn main(){
             let mut counter:usize = 0;
             for zone in EVISCERATE_ZONES{
                 // println!("Evisceration occurring at zone {}",zone);
-                let no:usize = hosts.clone().into_iter().filter(|x| x.motile == 0 && x.zone == zone && !x.eviscerated).collect::<Vec<_>>().len()/NO_OF_LINES[counter];
+                let no:usize = hosts.clone().into_iter().filter(|x| x.motile == 0 && x.zone == zone && !x.eviscerated).collect::<Vec<_>>().len()/line_no;
                 // for set_no in 0..NO_OF_LINES[counter]{
                 //     zones[zone].multi_eviscerate(&mut eviscerators,&mut hosts,time.clone(),no,set_no);
                 // }
-                zones[zone].multi_eviscerate(&mut eviscerators,&mut hosts,time.clone(), counter, no);
+                zones[zone].multi_eviscerate(&mut eviscerators,&mut hosts,time.clone(), counter, no,line_no);
                 counter+=1;
                 // println!("{} hosts have been eviscerated and infected so far",hosts.clone().into_iter().filter(|x| x.eviscerated && x.infected).collect::<Vec<_>>().len() as u64);
             }
@@ -1659,72 +1693,72 @@ fn main(){
         //Farm
         let no_of_zones:usize = GRIDSIZE.len();
         let collection_zone_no:u8 = no_of_zones as u8+1;
-        //Call once
-        for iter in 0..no_of_zones{
-            let [mut perc_cont,mut perc,mut perc2,mut total_hosts,mut total_hosts2,mut perc3,mut perc4,mut total_hosts4] = host::zone_report(&hosts,iter);            
-            let no_cont = perc_cont.clone()*total_hosts;
-            perc_cont*=100.0;
-            let no = perc.clone()*total_hosts;
-            perc = perc*100.0;
-            let no2 = perc2.clone()*total_hosts2;        
-            perc2 = perc2*100.0;
-            let no3 = perc3.clone()*total_hosts;
-            perc3 *= 100.0;
-            let no4 = perc4.clone()*total_hosts4;
-            perc4 = perc4*100.0;
-            wtr.write_record(&[
-                perc_cont.to_string(),
-                total_hosts.to_string(),
-                no_cont.to_string(),
-                perc.to_string(),
-                total_hosts.to_string(),
-                no.to_string(),
-                perc2.to_string(),
-                total_hosts2.to_string(),
-                no2.to_string(),
-                perc3.to_string(),
-                no3.to_string(),
-                perc4.to_string(),
-                total_hosts4.to_string(),
-                no4.to_string(),
-                format!("Zone {}", iter),
-            ]);
-        }
+        // //Call once
+        // for iter in 0..no_of_zones{
+        //     let [mut perc_cont,mut perc,mut perc2,mut total_hosts,mut total_hosts2,mut perc3,mut perc4,mut total_hosts4] = host::zone_report(&hosts,iter);            
+        //     let no_cont = perc_cont.clone()*total_hosts;
+        //     perc_cont*=100.0;
+        //     let no = perc.clone()*total_hosts;
+        //     perc = perc*100.0;
+        //     let no2 = perc2.clone()*total_hosts2;        
+        //     perc2 = perc2*100.0;
+        //     let no3 = perc3.clone()*total_hosts;
+        //     perc3 *= 100.0;
+        //     let no4 = perc4.clone()*total_hosts4;
+        //     perc4 = perc4*100.0;
+        //     wtr.write_record(&[
+        //         perc_cont.to_string(),
+        //         total_hosts.to_string(),
+        //         no_cont.to_string(),
+        //         perc.to_string(),
+        //         total_hosts.to_string(),
+        //         no.to_string(),
+        //         perc2.to_string(),
+        //         total_hosts2.to_string(),
+        //         no2.to_string(),
+        //         perc3.to_string(),
+        //         no3.to_string(),
+        //         perc4.to_string(),
+        //         total_hosts4.to_string(),
+        //         no4.to_string(),
+        //         format!("Zone {}", iter),
+        //     ]);
+        // }
 
         // //Collection
         // let [mut _perc,mut _perc2,mut _total_hosts,mut _total_hosts2] = host::report(&feast);
-        let _no = hosts_in_collection[0];
-        let _perc = (hosts_in_collection[0] as f64)/(hosts_in_collection[1] as f64) * 100.0;
-        let _perc_cont = (contaminants as f64)/(hosts_in_collection[1] as f64) * 100.0;
-        let _no2 = deposits_in_collection[0];
-        let _perc2 = (deposits_in_collection[0] as f64)/(deposits_in_collection[1] as f64)*100.0;
-        let _total_hosts = hosts_in_collection[1];
-        let _total_hosts2 = deposits_in_collection[1];
-        let _no3 = colonials_in_collection[0];
-        let _perc3 = (colonials_in_collection[0] as f64)/(colonials_in_collection[1] as f64) * 100.0;
-        let _no4 = faecal_collection[0];
-        let _perc4 = (faecal_collection[0] as f64)/(faecal_collection[1] as f64)*100.0;
-        let _total_faeces = faecal_collection[1];
-        // println!("{} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2);    
-        // println!("{} {} {} {} {} {} {} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2,_perc,_total_hosts,_no,_perc2,_total_hosts2,_no2);
-        wtr.write_record(&[
-            _perc_cont.to_string(),
-            _total_hosts.to_string(),
-            contaminants.to_string(),
-            _perc.to_string(),
-            _total_hosts.to_string(),
-            _no.to_string(),
-            _perc2.to_string(), //Eggs
-            _total_hosts2.to_string(),
-            _no2.to_string(),
-            _perc3.to_string(),            //Colonized Hosts
-            _no3.to_string(),
-            _perc4.to_string(), //faeces
-            _total_faeces.to_string(),
-            _no4.to_string(),
-            "Collection Zone".to_string(),
-        ])
-        .unwrap();
+        // let _no = hosts_in_collection[0];
+        // let _perc = (hosts_in_collection[0] as f64)/(hosts_in_collection[1] as f64) * 100.0;
+        // let _perc_cont = (contaminants as f64)/(hosts_in_collection[1] as f64) * 100.0;
+        // let _no2 = deposits_in_collection[0];
+        // let _perc2 = (deposits_in_collection[0] as f64)/(deposits_in_collection[1] as f64)*100.0;
+        // let _total_hosts = hosts_in_collection[1];
+        // let _total_hosts2 = deposits_in_collection[1];
+        // let _no3 = colonials_in_collection[0];
+        // let _perc3 = (colonials_in_collection[0] as f64)/(colonials_in_collection[1] as f64) * 100.0;
+        // let _no4 = faecal_collection[0];
+        // let _perc4 = (faecal_collection[0] as f64)/(faecal_collection[1] as f64)*100.0;
+        // let _total_faeces = faecal_collection[1];
+        // // println!("{} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2);    
+        // // println!("{} {} {} {} {} {} {} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2,_perc,_total_hosts,_no,_perc2,_total_hosts2,_no2);
+        // wtr.write_record(&[
+        //     _perc_cont.to_string(),
+        //     _total_hosts.to_string(),
+        //     contaminants.to_string(),
+        //     _perc.to_string(),
+        //     _total_hosts.to_string(),
+        //     _no.to_string(),
+        //     _perc2.to_string(), //Eggs
+        //     _total_hosts2.to_string(),
+        //     _no2.to_string(),
+        //     _perc3.to_string(),            //Colonized Hosts
+        //     _no3.to_string(),
+        //     _perc4.to_string(), //faeces
+        //     _total_faeces.to_string(),
+        //     _no4.to_string(),
+        //     "Collection Zone".to_string(),
+        // ])
+        // .unwrap();
 
         // if host::report(&hosts)[2]<5.0{break;}
     }
@@ -1744,24 +1778,41 @@ fn main(){
     let _total_faeces = faecal_collection[1];
     // println!("{} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2);    
     // println!("{} {} {} {} {} {} {} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2,_perc,_total_hosts,_no,_perc2,_total_hosts2,_no2);
+    // wtr.write_record(&[
+    //     _perc_cont.to_string(),
+    //     _total_hosts.to_string(),
+    //     contaminants.to_string(),
+    //     _perc.to_string(),
+    //     _total_hosts.to_string(),
+    //     _no.to_string(),
+    //     _perc2.to_string(), //Eggs
+    //     _total_hosts2.to_string(),
+    //     _no2.to_string(),
+    //     _perc3.to_string(),            //Colonized Hosts
+    //     _no3.to_string(),
+    //     _perc4.to_string(), //faeces
+    //     _total_faeces.to_string(),
+    //     _no4.to_string(),
+    //     "Collection Zone".to_string(),
+    // ])
+    // .unwrap();    
+    let total_no_of_probes = NO_OF_PROBES[0]*NO_OF_EVISCERATORS*line_no;
+    let cont_per_line = HOST_0/line_no;
+    let host_per_probe = ((TOTAL_NO_OF_HOSTS as f64)/line_no as f64);
+    let const_per_probe = ((HOST_0 as f64)/line_no as f64);
+
     wtr.write_record(&[
+        line_no.to_string(),
+        total_no_of_probes.to_string(),
+        TOTAL_NO_OF_HOSTS.to_string(),
+        HOST_0.to_string(),
+        cont_per_line.to_string(),
+        host_per_probe.to_string(),
+        const_per_probe.to_string(),
         _perc_cont.to_string(),
-        _total_hosts.to_string(),
-        contaminants.to_string(),
-        _perc.to_string(),
-        _total_hosts.to_string(),
-        _no.to_string(),
-        _perc2.to_string(), //Eggs
-        _total_hosts2.to_string(),
-        _no2.to_string(),
-        _perc3.to_string(),            //Colonized Hosts
-        _no3.to_string(),
-        _perc4.to_string(), //faeces
-        _total_faeces.to_string(),
-        _no4.to_string(),
         "Collection Zone".to_string(),
     ])
-    .unwrap();    
+    .unwrap();        
     wtr.flush().unwrap();
     // println!("{} {} {} {} {} {}",STEP[0][0],STEP[0][1],STEP[0][2],LENGTH,GRIDSIZE.len(), TRANSFER_DISTANCE); //Last 5 lines are going to be zone config lines that need to be picked out in plotter.py
     for zone in 0..GRIDSIZE.len(){
@@ -1813,7 +1864,7 @@ fn main(){
     writeln!(file, "\n## Eviscerator Configuration enabled:{}",EVISCERATE).expect("Failed to write to file");
     writeln!(file, "- Evisceration Zones: {:?}", EVISCERATE_ZONES).expect("Failed to write to file");   
     writeln!(file, "- NUMBER OF EVISCERATORS PROBES: {:?}", NO_OF_PROBES).expect("Failed to write to file");   
-    writeln!(file, "- NUMBER OF EVISCERATOR MACHINES (each containing said amount of probes above): {:?}", NO_OF_LINES).expect("Failed to write to file");   
+    writeln!(file, "- NUMBER OF EVISCERATOR MACHINES (each containing said amount of probes above): {:?}", line_no).expect("Failed to write to file");   
     writeln!(file, "- EVISCERATOR DECAY: {} (Number of hosts an eviscerator has to go through before the infection is gone)", EVISCERATE_DECAY).expect("Failed to write to file");        
     writeln!(file, "- MISHAP: {} (Can hosts explode by accident during evisceration??)", MISHAP).expect("Failed to write to file");        
     writeln!(file, "- MISHAP_PROBABILITY: {} (At what probability does this accident happen??)", MISHAP_PROBABILITY).expect("Failed to write to file");        
