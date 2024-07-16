@@ -152,6 +152,7 @@ impl Segment_3D{
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Eviscerator{
     zone:usize,
     set:usize,
@@ -244,12 +245,69 @@ impl Zone_3D{
             }
         }
     }
-    fn eviscerate(&mut self,eviscerators:&mut Vec<Eviscerator>, vector1:&mut Vec<host>,time:usize,no_to_do:usize, set:usize){
-        //grab hosts that are inside the zone and not eviscerated and actually the previously motile hosts
-        let mut vector: Vec<&mut host> = vector1.iter_mut().filter(|host| !host.eviscerated && host.zone == self.zone && host.motile == 0).take(no_to_do).collect();
-        
-        let vector_length:usize = vector.len();
+    fn multi_eviscerate(
+        &mut self,
+        eviscerators: &mut Vec<Eviscerator>,
+        vector1: &mut Vec<host>,
+        time: usize,
+        counter:usize,
+        no_to_do: usize
+    ) {
+        // Sort eviscerators by chronology
+        eviscerators.sort_by_key(|ev| ev.chronology);
+        vector1.sort_by(|a,b| a.origin_x.cmp(&b.origin_x));
+        let mut processed_eviscerators = Vec::new(); // Vector to hold processed eviscerators
+        // println!("Zone of the hosts here are ")
+        for line in 0..NO_OF_LINES[counter]{
+            let mut vector: Vec<&mut host> = vector1.iter_mut().filter(|host| !host.eviscerated && host.zone == self.zone && host.motile == 0).take(no_to_do).collect();
+            for chronology in 0..=NO_OF_EVISCERATORS-1 {
+                let mut eviscerators_for_this_chronology = eviscerators
+                    .iter()
+                    .filter(|ev| ev.chronology == chronology && ev.set == line && ev.zone == self.zone)
+                    .cloned()
+                    .collect::<Vec<_>>();
 
+                println!("We have {} probes on this eviscerator to process this, and {} of them are contaminated",eviscerators_for_this_chronology.clone().len() as u64 ,eviscerators_for_this_chronology.clone().into_par_iter().filter(|x| x.infected).collect::<Vec<_>>().len() as u64);
+                // println!("We have {} contaminated hosts before processing via {}th eviscerator",vector1.clone().into_par_iter().filter(|x| x.motile == 0 && x.contaminated).collect::<Vec<_>>().len() as u64,chronology);
+                // Process hosts with eviscerators of the current chronology
+                let evis_after = self.eviscerate(&mut eviscerators_for_this_chronology, &mut vector, time, line);
+
+                // Record the processed eviscerators
+                processed_eviscerators.extend_from_slice(&evis_after);
+                // println!("We have {} contaminated hosts after processing via {}th eviscerator",vector1.clone().into_par_iter().filter(|x| x.motile == 0 && x.contaminated).collect::<Vec<_>>().len() as u64,chronology);
+                // Optionally, update vector1 with the processed hosts
+                // vector1 = processed_hosts;
+            }
+        }
+
+
+
+        // Update the original eviscerators vector with the processed ones
+        // println!("Eviscerators before {:?}", eviscerators.clone().into_par_iter().filter(|x| x.infected).collect::<Vec<_>>().len() as u64);
+        *eviscerators = processed_eviscerators.clone();
+        // println!("Eviscerators after {:?}",processed_eviscerators.clone().into_par_iter().filter(|x| x.infected).collect::<Vec<_>>().len() as u64);
+        // for host in vector1.iter_mut() {
+        //     host.eviscerated = true; // Assuming 'eviscerated' is a boolean field in your Host struct
+        // }        
+    }
+    
+
+    fn eviscerate(&mut self,evs:&mut Vec<Eviscerator>, vector:&mut Vec<&mut host>,time:usize, set:usize)->Vec<Eviscerator>{
+        //SETUP
+        println!("Are we even eviscerating?");
+        println!("Current zone is {}", self.zone);
+        // println!("Number to do is {}", no_to_do);
+        // let mut vector: Vec<&mut host> = vector1.iter_mut().filter(|host| !host.eviscerated && host.zone == self.zone && host.motile == 0).take(no_to_do).collect();
+        // let mut vector: Vec<&mut host> = vector1.iter_mut().filter(|host| !host.eviscerated && host.motile == 0).take(no_to_do).collect();
+        // println!("Length of relevant vector hosts is {}", vector.len());
+        // let cloned_vector: Vec<host> = vector.iter().map(|host_ref| host_ref.clone()).collect();
+        println!("We have {} hosts before to eviscerate, {} of them are contaminated",vector.iter().filter(|&x| {
+            !x.eviscerated
+        }).collect::<Vec<_>>().len(), vector.iter().filter(|&x| {
+            x.contaminated
+        }).collect::<Vec<_>>().len());
+
+        let vector_length:usize = vector.len();
         let no_infected : usize = vector.iter().filter(|&x| {
             x.infected
         }).collect::<Vec<_>>().len();
@@ -257,8 +315,9 @@ impl Zone_3D{
             !x.infected
         }).collect::<Vec<_>>().len();
         // println!("[BEFORE] : {} of {} hosts in this evisceration process, at zone {} are not-infected, while {} are infected",no_not_infected,vector_length,self.zone, no_infected);
+
         //Filter out eviscerators that are for the zone in particular
-        let mut evs: Vec<&mut Eviscerator> = eviscerators.iter_mut().filter(|ev| ev.zone == self.zone && ev.set == set).sorted_by_key(|ev| ev.chronology).collect();
+        // let mut evs: Vec<&mut Eviscerator> = eviscerators.iter_mut().filter(|ev| ev.zone == self.zone && ev.set == set).collect();
         // Define the step size for comparison
         let step_size = NO_OF_PROBES[self.zone-1];
 
@@ -361,7 +420,7 @@ impl Zone_3D{
         
         // --------
         // let number_of_sets:usize = NO_OF_LINES[self.zone-1];
-        //Evisceration spread
+        //EXECUTION
         vector.sort_by(|a,b| a.origin_x.cmp(&b.origin_x));
         // Create an iterator to loop over the vector in step_size chunks
         let mut chunk_iter = vector.chunks_exact_mut(step_size);
@@ -416,10 +475,10 @@ impl Zone_3D{
                     host.contaminated = true; //infected = contaminated
                     println!("{} {} {} {} {} {}",host.x,host.y,host.z,13,time,host.zone);
                 }                
-                let mut eviscerator:&mut Eviscerator = evs[j%step_size];
+                let mut eviscerator:&mut Eviscerator = &mut evs[j%step_size];
                 if (host.infected || host.contaminated) && host.zone == eviscerator.zone && !host.eviscerated && host.transfer(CONTACT_TRANSMISSION_PROBABILITY[host.zone]){
                     eviscerator.infected = true;
-                    // println!("EVISCERATOR HAS BEEN INFECTED AT TIME {} of this host stock entering zone!",host.time);
+                    println!("EVISCERATOR HAS BEEN INFECTED AT TIME {} of this host stock entering zone!",host.time);
                     eviscerator.number_of_times_infected = 0;
                     println!("{} {} {} {} {} {}",host.x,host.y,host.z,12,time,host.zone);
                 }else if eviscerator.infected && host.zone == eviscerator.zone && !host.eviscerated{
@@ -441,12 +500,11 @@ impl Zone_3D{
             }
             global_index += step_size;
         }
+        // println!("We have {} contaminated hosts after processing",vector1.clone().into_par_iter().filter(|x| x.motile == 0 && x.contaminated).collect::<Vec<_>>().len() as u64);        
+        let cloned_eviscerators: Vec<Eviscerator> = evs.iter().cloned().collect();
 
-
-        // println!("[AFTER] : {} of {} hosts in this evisceration process, at zone {} are not-infected, while {} are infected",no_not_infected,vector_length,self.zone, no_infected);
-
-
-
+        // Return the cloned vector
+        cloned_eviscerators
 
     }    
 }
@@ -494,7 +552,7 @@ const TOTAL_NO_OF_HOSTS:f64 = 42000.0;
 const HOST_0:usize = (PERCENT_INF*TOTAL_NO_OF_HOSTS) as usize; //8.36% of population infected 
 const COLONIZATION_SPREAD_MODEL:bool = true;
 const TIME_OR_CONTACT:bool = true; //true for time -> contact uses number of times infected to determine colonization
-const IMMORTAL_CONTAMINATION:bool = false;
+const IMMORTAL_CONTAMINATION:bool = true;
 //If you want to use a truncated normal distribution for time to go from infected to colonized ...
 const TIME_TO_COLONIZE:[f64;2] = [5.0*24.0, 11.6*24.0]; //95% CI for generation time
 const COLONIZE_TIME_MAX_OVERRIDE:f64 = 26.0*24.0;
@@ -518,7 +576,7 @@ const FAECESTOEGG_CONTACT_SPREAD:bool = true;
 // const INITIAL_COLONIZATION_RATE:f64 = 0.47; //Probability of infection, resulting in colonization -> DAILY RATE ie PER DAY
 //Space
 const LISTOFPROBABILITIES:[f64;2] = [0.9;2]; //Probability of transfer of disease per zone - starting from zone 0 onwards
-const CONTACT_TRANSMISSION_PROBABILITY:[f64;2] = [0.35;2];
+const CONTACT_TRANSMISSION_PROBABILITY:[f64;2] = [0.58;2];
 const GRIDSIZE:[[f64;3];2] = [[4.0*TOTAL_NO_OF_HOSTS,4.0,4.0],[28000.0,2.0,2.0]]; 
 const MAX_MOVE:f64 = 10.0;
 const MEAN_MOVE:f64 = 4.0;
@@ -1418,13 +1476,14 @@ fn main(){
             for set_no in 0..NO_OF_LINES[index]{
                 for _ in 0..NO_OF_PROBES[index]{
                     for chronology in 0..NO_OF_EVISCERATORS{
-                        eviscerators.push(Eviscerator{zone:EVISCERATE_ZONES[index],set:set_no,infected:false,number_of_times_infected:0})
+                        //each struct you are pushing represents a probe
+                        eviscerators.push(Eviscerator{zone:EVISCERATE_ZONES[index],set:set_no,infected:false, chronology:chronology,number_of_times_infected:0})
                     }
                 }
             }
         }
     }
-    
+    println!("We have a total of {} eviscerators spawned", eviscerators.clone().len());
     //Initialise with hosts in the first zone only
     for grid in 0..GRIDSIZE.len(){
         zones.push(Zone_3D::generate_empty(grid,[GRIDSIZE[grid][0] as u64,GRIDSIZE[grid][1] as u64,GRIDSIZE[grid][2] as u64],STEP[grid]));
@@ -1456,6 +1515,9 @@ fn main(){
         // Use infect multiple to infect 1 host at a time inside the grid/zone and you can randomly choose the location - here as a uniform distribution 
         hosts = host::infect_multiple(hosts,uniform(0.0,GRIDSIZE[zone_to_infect][0]) as u64,uniform(0.0,GRIDSIZE[zone_to_infect][1]) as u64,uniform(0.0,GRIDSIZE[zone_to_infect][2])as u64,1,0,true);
     }
+    let no_of_contaminated_hosts: u64 = hosts.clone().into_par_iter().filter(|x| x.motile == 0 && x.contaminated).collect::<Vec<_>>().len() as u64;
+    let no_of_hosts: u64 = hosts.clone().into_par_iter().filter(|x| x.motile == 0).collect::<Vec<_>>().len() as u64;
+    println!("This many {} hosts are there, and {}% are contaminated as a start",no_of_hosts,(no_of_contaminated_hosts as f64)/(no_of_hosts as f64));
 
     // println!("Total number of hosts is {}", hosts.len());
     // for segment in &mut zones[0].segments {
@@ -1528,10 +1590,11 @@ fn main(){
             let mut counter:usize = 0;
             for zone in EVISCERATE_ZONES{
                 // println!("Evisceration occurring at zone {}",zone);
-                let no:usize = hosts.clone().into_iter().filter(|x| x.motile == 0).collect::<Vec<_>>().len()/NO_OF_LINES[counter];
-                for set_no in 0..NO_OF_LINES[counter]{
-                    zones[zone].eviscerate(&mut eviscerators,&mut hosts,time.clone(),no,set_no);
-                }
+                let no:usize = hosts.clone().into_iter().filter(|x| x.motile == 0 && x.zone == zone && !x.eviscerated).collect::<Vec<_>>().len()/NO_OF_LINES[counter];
+                // for set_no in 0..NO_OF_LINES[counter]{
+                //     zones[zone].multi_eviscerate(&mut eviscerators,&mut hosts,time.clone(),no,set_no);
+                // }
+                zones[zone].multi_eviscerate(&mut eviscerators,&mut hosts,time.clone(), counter, no);
                 counter+=1;
                 // println!("{} hosts have been eviscerated and infected so far",hosts.clone().into_iter().filter(|x| x.eviscerated && x.infected).collect::<Vec<_>>().len() as u64);
             }
@@ -1597,71 +1660,71 @@ fn main(){
         let no_of_zones:usize = GRIDSIZE.len();
         let collection_zone_no:u8 = no_of_zones as u8+1;
         //Call once
-        // for iter in 0..no_of_zones{
-        //     let [mut perc_cont,mut perc,mut perc2,mut total_hosts,mut total_hosts2,mut perc3,mut perc4,mut total_hosts4] = host::zone_report(&hosts,iter);            
-        //     let no_cont = perc_cont.clone()*total_hosts;
-        //     perc_cont*=100.0;
-        //     let no = perc.clone()*total_hosts;
-        //     perc = perc*100.0;
-        //     let no2 = perc2.clone()*total_hosts2;        
-        //     perc2 = perc2*100.0;
-        //     let no3 = perc3.clone()*total_hosts;
-        //     perc3 *= 100.0;
-        //     let no4 = perc4.clone()*total_hosts4;
-        //     perc4 = perc4*100.0;
-        //     wtr.write_record(&[
-        //         perc_cont.to_string(),
-        //         total_hosts.to_string(),
-        //         no_cont.to_string(),
-        //         perc.to_string(),
-        //         total_hosts.to_string(),
-        //         no.to_string(),
-        //         perc2.to_string(),
-        //         total_hosts2.to_string(),
-        //         no2.to_string(),
-        //         perc3.to_string(),
-        //         no3.to_string(),
-        //         perc4.to_string(),
-        //         total_hosts4.to_string(),
-        //         no4.to_string(),
-        //         format!("Zone {}", iter),
-        //     ]);
-        // }
+        for iter in 0..no_of_zones{
+            let [mut perc_cont,mut perc,mut perc2,mut total_hosts,mut total_hosts2,mut perc3,mut perc4,mut total_hosts4] = host::zone_report(&hosts,iter);            
+            let no_cont = perc_cont.clone()*total_hosts;
+            perc_cont*=100.0;
+            let no = perc.clone()*total_hosts;
+            perc = perc*100.0;
+            let no2 = perc2.clone()*total_hosts2;        
+            perc2 = perc2*100.0;
+            let no3 = perc3.clone()*total_hosts;
+            perc3 *= 100.0;
+            let no4 = perc4.clone()*total_hosts4;
+            perc4 = perc4*100.0;
+            wtr.write_record(&[
+                perc_cont.to_string(),
+                total_hosts.to_string(),
+                no_cont.to_string(),
+                perc.to_string(),
+                total_hosts.to_string(),
+                no.to_string(),
+                perc2.to_string(),
+                total_hosts2.to_string(),
+                no2.to_string(),
+                perc3.to_string(),
+                no3.to_string(),
+                perc4.to_string(),
+                total_hosts4.to_string(),
+                no4.to_string(),
+                format!("Zone {}", iter),
+            ]);
+        }
 
         // //Collection
-        // // let [mut _perc,mut _perc2,mut _total_hosts,mut _total_hosts2] = host::report(&feast);
-        // let _no = hosts_in_collection[0];
-        // let _perc = (hosts_in_collection[0] as f64)/(hosts_in_collection[1] as f64) * 100.0;
-        // let _perc_cont = (contaminants as f64)/(hosts_in_collection[1] as f64) * 100.0;
-        // let _no2 = deposits_in_collection[0];
-        // let _perc2 = (deposits_in_collection[0] as f64)/(deposits_in_collection[1] as f64)*100.0;
-        // let _total_hosts = hosts_in_collection[1];
-        // let _total_hosts2 = deposits_in_collection[1];
-        // let _no3 = colonials_in_collection[0];
-        // let _perc3 = (colonials_in_collection[0] as f64)/(colonials_in_collection[1] as f64) * 100.0;
-        // let _no4 = faecal_collection[0];
-        // let _perc4 = (faecal_collection[0] as f64)/(faecal_collection[1] as f64)*100.0;
-        // let _total_faeces = faecal_collection[1];
-        // // println!("{} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2);    
-        // // println!("{} {} {} {} {} {} {} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2,_perc,_total_hosts,_no,_perc2,_total_hosts2,_no2);
-        // wtr.write_record(&[
-        //     _perc_cont.to_string(),
-        //     _total_hosts.to_string(),
-        //     contaminants.to_string(),
-        //     _perc.to_string(),
-        //     _total_hosts.to_string(),
-        //     _no.to_string(),
-        //     _perc2.to_string(), //Eggs
-        //     _total_hosts2.to_string(),
-        //     _no2.to_string(),
-        //     _perc3.to_string(),            //Colonized Hosts
-        //     _no3.to_string(),
-        //     _perc4.to_string(), //faeces
-        //     _total_faeces.to_string(),
-        //     _no4.to_string(),
-        //     "Collection Zone".to_string(),
-        // ])
-        // .unwrap();
+        // let [mut _perc,mut _perc2,mut _total_hosts,mut _total_hosts2] = host::report(&feast);
+        let _no = hosts_in_collection[0];
+        let _perc = (hosts_in_collection[0] as f64)/(hosts_in_collection[1] as f64) * 100.0;
+        let _perc_cont = (contaminants as f64)/(hosts_in_collection[1] as f64) * 100.0;
+        let _no2 = deposits_in_collection[0];
+        let _perc2 = (deposits_in_collection[0] as f64)/(deposits_in_collection[1] as f64)*100.0;
+        let _total_hosts = hosts_in_collection[1];
+        let _total_hosts2 = deposits_in_collection[1];
+        let _no3 = colonials_in_collection[0];
+        let _perc3 = (colonials_in_collection[0] as f64)/(colonials_in_collection[1] as f64) * 100.0;
+        let _no4 = faecal_collection[0];
+        let _perc4 = (faecal_collection[0] as f64)/(faecal_collection[1] as f64)*100.0;
+        let _total_faeces = faecal_collection[1];
+        // println!("{} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2);    
+        // println!("{} {} {} {} {} {} {} {} {} {} {} {}",perc,total_hosts,no,perc2,total_hosts2,no2,_perc,_total_hosts,_no,_perc2,_total_hosts2,_no2);
+        wtr.write_record(&[
+            _perc_cont.to_string(),
+            _total_hosts.to_string(),
+            contaminants.to_string(),
+            _perc.to_string(),
+            _total_hosts.to_string(),
+            _no.to_string(),
+            _perc2.to_string(), //Eggs
+            _total_hosts2.to_string(),
+            _no2.to_string(),
+            _perc3.to_string(),            //Colonized Hosts
+            _no3.to_string(),
+            _perc4.to_string(), //faeces
+            _total_faeces.to_string(),
+            _no4.to_string(),
+            "Collection Zone".to_string(),
+        ])
+        .unwrap();
 
         // if host::report(&hosts)[2]<5.0{break;}
     }
