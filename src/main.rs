@@ -281,6 +281,9 @@ impl Zone_3D{
                 // Optionally, update vector1 with the processed hosts
                 // vector1 = processed_hosts;
             }
+            for host in vector.iter_mut() {
+                host.eviscerated = true; // Assuming 'eviscerated' is a boolean field in your Host struct
+            }                      
         }
 
 
@@ -497,7 +500,7 @@ impl Zone_3D{
                 if eviscerator.number_of_times_infected>=EVISCERATE_DECAY{
                     eviscerator.infected = false;
                 }
-                host.eviscerated = true;
+                // host.eviscerated = true;
                 // if MISHAP && host.infected && ind.contains(&j) && MISHAP_RADIUS>minimum_distance && roll(MISHAP_PROBABILITY){
                 // }
             }
@@ -551,7 +554,7 @@ const LENGTH: usize =20; //How long do you want the simulation to be?
 //Infection/Colonization module
 // ------------Do only colonized hosts spread disease or do infected hosts spread
 const PERCENT_INF:f64 = 8.36/100.0;
-const TOTAL_NO_OF_HOSTS:f64 = 7000.0;
+const TOTAL_NO_OF_HOSTS:f64 = 14000.0;
 const HOST_0:usize = (PERCENT_INF*TOTAL_NO_OF_HOSTS) as usize; //8.36% of population infected 
 const COLONIZATION_SPREAD_MODEL:bool = true;
 const TIME_OR_CONTACT:bool = true; //true for time -> contact uses number of times infected to determine colonization
@@ -641,7 +644,7 @@ const EVISCERATE_DECAY:u8 = 5;
 const NO_OF_PROBES:[usize;1] = [28;1]; //no of probes per eviscerator
 const LINE_NO: usize = 3;
 const NO_OF_LINES:[usize;1] = [LINE_NO;1];
-const NO_OF_EVISCERATORS:usize = 3;
+const NO_OF_EVISCERATORS:usize = 1;
 const EVISCERATOR_TO_HOST_PROBABILITY_DECAY:f64 = 0.25;   //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
 const CLEAN_EVISCERATORS:bool = false; //Be sure to set the hours when eviscerators are manually cleaned yourself (Might need to run simulation to figure out when evisceraors get  used at all)
 const SERIAL_EVISCERATION:bool = false; //Are the hosts going through multiple eviscerations? (ideally via consecutive zones or through a separately implemented logic)
