@@ -1,8 +1,8 @@
 ## Space
 - RESTRICTION: true (Are the hosts restricted to segments within each zone)
 - INFECTION PROBABILITIES PER ZONE: [0.9, 0.9] (Probability of transfer of salmonella per zone)
-- CONTACT TRANSMISSION PROBABILITIES PER ZONE: [0.35, 0.35] (Probability of transfer of salmonella per zone)
-- GRIDSIZE: [[168000.0, 4.0, 4.0], [28000.0, 2.0, 2.0]] (Size of the grid)
+- CONTACT TRANSMISSION PROBABILITIES PER ZONE: [0.33, 0.33] (Probability of transfer of salmonella per zone)
+- GRIDSIZE: [[84000.0, 4.0, 4.0], [28000.0, 2.0, 2.0]] (Size of the grid)
 - MAX_MOVE: 10 (Maximum move value)
 - MEAN_MOVE: 4 (Mean move value)
 - STD_MOVE: 3 (Standard deviation of move value)
@@ -22,11 +22,11 @@
 ## Eviscerator Configuration enabled:true
 - Evisceration Zones: [1]
 - NUMBER OF EVISCERATORS PROBES: [28]
-- NUMBER OF EVISCERATOR MACHINES (each containing said amount of probes above): [1]
+- NUMBER OF EVISCERATOR MACHINES (each containing said amount of probes above): 1
 - EVISCERATOR DECAY: 5 (Number of hosts an eviscerator has to go through before the infection is gone)
 - MISHAP: true (Can hosts explode by accident during evisceration??)
-- MISHAP_PROBABILITY: 0.01 (At what probability does this accident happen??)
-- MISHAP_RADIUS: 10 (At what radius does this explosion occur - (currently fixed radius)??)
+- MISHAP_PROBABILITY: 0.25 (At what probability does this accident happen??)
+- MISHAP_RADIUS: 2 (At what radius does this explosion occur - (currently fixed radius)??)
 
 ## Transfer Configuration
 - Times Manual Map: [0.01, 1.0] (Times that hosts have to spend in each zone)
