@@ -458,7 +458,8 @@ impl Zone_3D {
         //Cosine rule to calculate c from a,b and angle AB between 2 nearest ( this and next line)
         let mut minimum_distance: f64 = 2.0 * (1.0 - angle.cos());
         minimum_distance = minimum_distance.powf(0.5) * (self.segments[0].range_x as f64) / angle;
-        //Way to remove this curvature calculation if CURVATURE IS FALSE -> relegating calculation to just the second linear term instead
+        //Way to remove this curvature calculation if CURVATURE IS FALSE -> relegating calculation to
+        //just the second linear term instead
         minimum_distance = minimum_distance * have_curvature
             + (self.segments[0].range_x as f64) * (1.0 - have_curvature);
 
@@ -499,7 +500,7 @@ impl Zone_3D {
 
         if MISHAP && MISHAP_RADIUS > minimum_distance {
             vector.iter_mut().enumerate().for_each(|(idx, mut host)| {
-                if host.infected && roll(MISHAP_PROBABILITY) {
+                if (host.infected || host.contaminated) && roll(MISHAP_PROBABILITY) {
                     //Assume that only a previously infected host that has been brought to the evisceration process exploding, can pose a threat of  spreading the infection -> a fresh uninfected chicken that has been simultaneously infected and exploded
                     //by the probe, should not intuitively count as a mishap infection event
                     ind.push(idx);
@@ -612,7 +613,7 @@ impl Zone_3D {
             for (j_ele, host) in chunk.iter_mut().enumerate() {
                 let j = global_index + j_ele;
                 // Compare and update the elements in the relative vector of eviscerators length
-                if j_ele >= start && j_ele <= end && !fail {
+                if j_ele >= start && j_ele <= end && !fail && roll(MISHAP_TRANSFER_PROBABILITY) {
                     //THIS SECTION HERE IS WHERE THE MISHAP explosions are applied RIGHT BEFORE the eviscerators
                     host.infected = true; //This is taking it that the moment a chicken's infected guts touch another chicken's, it's been contaminated at 100% chance, so we just set to true given the prevailing conditions have been met
                     host.contaminated = true; //infected = contaminated
@@ -736,7 +737,7 @@ const FAECESTOEGG_CONTACT_SPREAD: bool = true;
 // const INITIAL_COLONIZATION_RATE:f64 = 0.47; //Probability of infection, resulting in colonization -> DAILY RATE ie PER DAY
 //Space
 const LISTOFPROBABILITIES: [f64; 2] = [0.9; 2]; //Probability of transfer of disease per zone - starting from zone 0 onwards
-const CONTACT_TRANSMISSION_PROBABILITY: [f64; 2] = [0.33; 2];
+const CONTACT_TRANSMISSION_PROBABILITY: [f64; 2] = [0.43; 2];
 const GRIDSIZE: [[f64; 3]; 2] = [[4.0 * TOTAL_NO_OF_HOSTS, 4.0, 4.0], [28000.0, 2.0, 2.0]];
 const MAX_MOVE: f64 = 10.0;
 const MEAN_MOVE: f64 = 4.0;
@@ -795,7 +796,7 @@ const EVISCERATE: bool = true;
 const EVISCERATE_ZONES: [usize; 1] = [1]; //Zone in which evisceration takes place
 const EVISCERATE_DECAY: u8 = 5;
 const NO_OF_PROBES: [usize; 1] = [28; 1]; //no of probes per eviscerator
-const LINE_NO: usize = 3;
+const LINE_NO: usize = 1;
 const NO_OF_LINES: [usize; 1] = [LINE_NO; 1];
 const NO_OF_EVISCERATORS: usize = 3;
 const EVISCERATOR_TO_HOST_PROBABILITY_DECAY: f64 = 0.25; //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
@@ -809,7 +810,8 @@ const PI: f64 = std::f64::consts::PI;
 const ANGLE_MAXIMA: f64 = 0.25 * PI; //Maximum angular displacement, above which, mishaps cannot travel anyway
                                      //Evisceration -------------> Mishap/Explosion parameters
 const MISHAP: bool = true;
-const MISHAP_PROBABILITY: f64 = 0.25;
+const MISHAP_PROBABILITY: f64 = 0.35;
+const MISHAP_TRANSFER_PROBABILITY: f64 = 0.5;
 const MISHAP_RADIUS: f64 = 2.0; //Must be larger than the range_x of the eviscerate boxes for there to be any change in operation
                                 //Transfer parameters
 const ages: [f64; 2] = [0.01, 1.0]; //Time hosts are expected spend in each region minimally

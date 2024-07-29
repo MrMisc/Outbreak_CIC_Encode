@@ -14,10 +14,10 @@ def update_json_line_no(filename, line_no):
         # Load the JSON file
         with open(filename, 'r+') as file:
             data = json.load(file)
-            
+
             # Update the LINE_NO value
             data['LINE_NO'] = line_no
-            
+
             # Move the file pointer to the beginning and overwrite the file
             file.seek(0)
             json.dump(data, file, indent=4)
@@ -27,5 +27,5 @@ def update_json_line_no(filename, line_no):
 
 for i in range(1,2):
     update_json_line_no('config.json', i)
-    for _ in range(15):
+    for _ in range(20):
         subprocess.run(['cargo', 'run'])
