@@ -710,7 +710,7 @@ const LENGTH: usize = 20; //How long do you want the simulation to be?
                           //Infection/Colonization module
                           // ------------Do only colonized hosts spread disease or do infected hosts spread
 const PERCENT_INF: f64 = 8.36 / 100.0;
-const TOTAL_NO_OF_HOSTS: f64 = 21000.0;
+const TOTAL_NO_OF_HOSTS: f64 = 7000.0;
 const HOST_0: usize = (PERCENT_INF * TOTAL_NO_OF_HOSTS) as usize; //8.36% of population infected
 const COLONIZATION_SPREAD_MODEL: bool = true;
 const TIME_OR_CONTACT: bool = true; //true for time -> contact uses number of times infected to determine colonization
@@ -737,7 +737,7 @@ const FAECESTOEGG_CONTACT_SPREAD: bool = true;
 // const INITIAL_COLONIZATION_RATE:f64 = 0.47; //Probability of infection, resulting in colonization -> DAILY RATE ie PER DAY
 //Space
 const LISTOFPROBABILITIES: [f64; 2] = [0.9; 2]; //Probability of transfer of disease per zone - starting from zone 0 onwards
-const CONTACT_TRANSMISSION_PROBABILITY: [f64; 2] = [0.43; 2];
+const CONTACT_TRANSMISSION_PROBABILITY: [f64; 2] = [0.06; 2];
 const GRIDSIZE: [[f64; 3]; 2] = [[4.0 * TOTAL_NO_OF_HOSTS, 4.0, 4.0], [28000.0, 2.0, 2.0]];
 const MAX_MOVE: f64 = 10.0;
 const MEAN_MOVE: f64 = 4.0;
@@ -811,7 +811,7 @@ const ANGLE_MAXIMA: f64 = 0.25 * PI; //Maximum angular displacement, above which
                                      //Evisceration -------------> Mishap/Explosion parameters
 const MISHAP: bool = true;
 const MISHAP_PROBABILITY: f64 = 0.35;
-const MISHAP_TRANSFER_PROBABILITY: f64 = 0.5;
+const MISHAP_TRANSFER_PROBABILITY: f64 = 0.2;
 const MISHAP_RADIUS: f64 = 2.0; //Must be larger than the range_x of the eviscerate boxes for there to be any change in operation
                                 //Transfer parameters
 const ages: [f64; 2] = [0.01, 1.0]; //Time hosts are expected spend in each region minimally
