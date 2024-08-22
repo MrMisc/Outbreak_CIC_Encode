@@ -3,6 +3,7 @@ use rand::distributions::Uniform;
 use rand::distributions::{Distribution, Standard};
 use rand::prelude::SliceRandom;
 use rand::{thread_rng, Rng};
+use rayon::iter::Cloned;
 use serde_json::Value;
 use statrs::distribution::{Gamma, Normal, Poisson, StudentsT, Triangular, Weibull};
 use std::env;
@@ -578,7 +579,9 @@ impl Zone_3D {
         // if let Some(first_chunk) = chunk_iter.next() {
         //     //just an example of a wayt o access the first element per chunk
         //     if let Some(first_element) = first_chunk.first_mut(){
-
+        //
+        //CLeanup rate for eviscerator probes
+        let mut eviscerated_hosts_count = 0;
         //     }
         // }
         for chunk in chunk_iter {
@@ -660,6 +663,11 @@ impl Zone_3D {
                 // host.eviscerated = true;
                 // if MISHAP && host.infected && ind.contains(&j) && MISHAP_RADIUS>minimum_distance && roll(MISHAP_PROBABILITY){
                 // }
+                eviscerated_hosts_count += 1;
+                if eviscerated_hosts_count % CLEANUP_RATE == 0 {
+                    evs.iter_mut().for_each(|mut x| x.infected = false);
+                    println!("Cleaning eviscerators AGAIN");
+                }
             }
             global_index += step_size;
         }
@@ -710,7 +718,7 @@ const LENGTH: usize = 20; //How long do you want the simulation to be?
                           //Infection/Colonization module
                           // ------------Do only colonized hosts spread disease or do infected hosts spread
 const PERCENT_INF: f64 = 8.36 / 100.0;
-const TOTAL_NO_OF_HOSTS: f64 = 21000.0;
+const TOTAL_NO_OF_HOSTS: f64 = 70000.0;
 const HOST_0: usize = (PERCENT_INF * TOTAL_NO_OF_HOSTS) as usize; //8.36% of population infected
 const COLONIZATION_SPREAD_MODEL: bool = true;
 const TIME_OR_CONTACT: bool = true; //true for time -> contact uses number of times infected to determine colonization
@@ -796,12 +804,13 @@ const EVISCERATE: bool = true;
 const EVISCERATE_ZONES: [usize; 1] = [1]; //Zone in which evisceration takes place
 const EVISCERATE_DECAY: u8 = 5;
 const NO_OF_PROBES: [usize; 1] = [28; 1]; //no of probes per eviscerator
-const LINE_NO: usize = 1;
+const LINE_NO: usize = 2;
 const NO_OF_LINES: [usize; 1] = [LINE_NO; 1];
 const NO_OF_EVISCERATORS: usize = 3;
 const EVISCERATOR_TO_HOST_PROBABILITY_DECAY: f64 = 0.25; //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
-const CLEAN_EVISCERATORS: bool = false; //Be sure to set the hours when eviscerators are manually cleaned yourself (Might need to run simulation to figure out when evisceraors get  used at all)
+const CLEAN_EVISCERATORS: bool = true; //Be sure to set the hours when eviscerators are manually cleaned yourself (Might need to run simulation to figure out when evisceraors get  used at all)
 const SERIAL_EVISCERATION: bool = false; //Are the hosts going through multiple eviscerations? (ideally via consecutive zones or through a separately implemented logic)
+const CLEANUP_RATE: usize = 1000;
 
 const CURVATURE: bool = true;
 //We are assuming that when eviscerators are brought into a circle, the distance between them is maintained - inevitably determining the radius of the curvature
@@ -2358,12 +2367,12 @@ fn main() {
             }
         }
         //Periodically cleaning eviscerators
-        if (time == 2 || time == 4 || time == 6 || time == 8 || time == 11) && CLEAN_EVISCERATORS {
-            // println!("Cleaning eviscerators!");
-            eviscerators.iter_mut().for_each(|mut ev| {
-                ev.infected = false;
-            })
-        }
+        // if (time == 4 || time == 7 || time == 11) && CLEAN_EVISCERATORS {
+        //     // println!("Cleaning eviscerators!");
+        //     eviscerators.iter_mut().for_each(|mut ev| {
+        //         ev.infected = false;
+        //     })
+        // }
 
         if EVISCERATE {
             let mut counter: usize = 0;
@@ -2598,6 +2607,7 @@ fn main() {
     let const_per_probe = ((HOST_0 as f64) / line_no as f64);
 
     wtr.write_record(&[
+        CLEANUP_RATE.to_string(),
         MISHAP_PROBABILITY.to_string(),
         line_no.to_string(),
         total_no_of_probes.to_string(),
