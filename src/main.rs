@@ -178,6 +178,7 @@ pub struct Eviscerator {
     infected: bool,
     chronology: usize,
     number_of_times_infected: u8,
+    clean_count: u32,
 }
 
 impl Zone_3D {
@@ -633,7 +634,8 @@ impl Zone_3D {
                 {
                     eviscerator.infected = true;
                     println!("EVISCERATOR HAS BEEN INFECTED AT TIME {} of this host stock entering zone!",host.time);
-                    eviscerator.number_of_times_infected = 0;
+                    eviscerator.clean_count = 0; //Eviscerator has ceased its "streak" of clean chickens
+                    eviscerator.number_of_times_infected += 1;
                     println!(
                         "{} {} {} {} {} {}",
                         host.x, host.y, host.z, 12, time, host.zone
@@ -648,16 +650,21 @@ impl Zone_3D {
                             * CONTACT_TRANSMISSION_PROBABILITY[host.zone],
                     )) || host.infected;
                     host.contaminated = host.infected || host.contaminated; //In evisceration process, an eviscerator infecting a chicken is equivalent to contaminating as well simultaneously!
-                    eviscerator.number_of_times_infected += 1;
+
                     if host.infected {
                         println!(
                             "{} {} {} {} {} {}",
                             host.x, host.y, host.z, 11, time, host.zone
                         );
                     }
+                    eviscerator.clean_count += 1; // Need to count how many times the eviscerator probe has actually processed 'clean' chickens : This includes contaminated chickens that did not manage to transfer their salmonella to the prober=
+                } else if host.zone == eviscerator.zone && !host.eviscerated {
+                    eviscerator.clean_count += 1; //For groundtruth, but counting the number of clean chickens an uninfected probe has processed is not functionally relevant, YET
                 }
                 //Decay of infection
-                if eviscerator.number_of_times_infected >= EVISCERATE_DECAY {
+                if eviscerator.clean_count
+                    >= ((1.0 / EVISCERATOR_TO_HOST_PROBABILITY_DECAY + 1.0) as u32)
+                {
                     eviscerator.infected = false;
                 }
                 // host.eviscerated = true;
@@ -717,7 +724,7 @@ const HOUR_STEP: f64 = 4.0; //Number of times hosts move per hour
 const LENGTH: usize = 20; //How long do you want the simulation to be?
                           //Infection/Colonization module
                           // ------------Do only colonized hosts spread disease or do infected hosts spread
-const PERCENT_INF: f64 = 8.36 / 100.0;
+const PERCENT_INF: f64 = 10.0 / 100.0;
 const TOTAL_NO_OF_HOSTS: f64 = 70000.0;
 const HOST_0: usize = (PERCENT_INF * TOTAL_NO_OF_HOSTS) as usize; //8.36% of population infected
 const COLONIZATION_SPREAD_MODEL: bool = true;
@@ -744,8 +751,8 @@ const EGGTOFAECES_CONTACT_SPREAD: bool = true;
 const FAECESTOEGG_CONTACT_SPREAD: bool = true;
 // const INITIAL_COLONIZATION_RATE:f64 = 0.47; //Probability of infection, resulting in colonization -> DAILY RATE ie PER DAY
 //Space
-const LISTOFPROBABILITIES: [f64; 2] = [0.9; 2]; //Probability of transfer of disease per zone - starting from zone 0 onwards
-const CONTACT_TRANSMISSION_PROBABILITY: [f64; 2] = [0.205; 2];
+const LISTOFPROBABILITIES: [f64; 2] = [1.0; 2]; //Probability of transfer of disease per zone - starting from zone 0 onwards
+const CONTACT_TRANSMISSION_PROBABILITY: [f64; 2] = [0.22; 2];
 const GRIDSIZE: [[f64; 3]; 2] = [[4.0 * TOTAL_NO_OF_HOSTS, 4.0, 4.0], [28000.0, 2.0, 2.0]];
 const MAX_MOVE: f64 = 10.0;
 const MEAN_MOVE: f64 = 4.0;
@@ -807,10 +814,10 @@ const NO_OF_PROBES: [usize; 1] = [28; 1]; //no of probes per eviscerator
 const LINE_NO: usize = 2;
 const NO_OF_LINES: [usize; 1] = [LINE_NO; 1];
 const NO_OF_EVISCERATORS: usize = 3;
-const EVISCERATOR_TO_HOST_PROBABILITY_DECAY: f64 = 0.25; //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
+const EVISCERATOR_TO_HOST_PROBABILITY_DECAY: f64 = 0.23; //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
 const CLEAN_EVISCERATORS: bool = true; //Be sure to set the hours when eviscerators are manually cleaned yourself (Might need to run simulation to figure out when evisceraors get  used at all)
 const SERIAL_EVISCERATION: bool = false; //Are the hosts going through multiple eviscerations? (ideally via consecutive zones or through a separately implemented logic)
-const CLEANUP_RATE: usize = 1000;
+const CLEANUP_RATE: usize = 70000;
 
 const CURVATURE: bool = true;
 //We are assuming that when eviscerators are brought into a circle, the distance between them is maintained - inevitably determining the radius of the curvature
@@ -819,7 +826,7 @@ const PI: f64 = std::f64::consts::PI;
 const ANGLE_MAXIMA: f64 = 0.25 * PI; //Maximum angular displacement, above which, mishaps cannot travel anyway
                                      //Evisceration -------------> Mishap/Explosion parameters
 const MISHAP: bool = true;
-const MISHAP_PROBABILITY: f64 = 0.1338;
+const MISHAP_PROBABILITY: f64 = 0.2063;
 const MISHAP_TRANSFER_PROBABILITY: f64 = 0.4;
 const MISHAP_RADIUS: f64 = 2.0; //Must be larger than the range_x of the eviscerate boxes for there to be any change in operation
                                 //Transfer parameters
@@ -2236,6 +2243,7 @@ fn main() {
                             infected: false,
                             chronology: chronology,
                             number_of_times_infected: 0,
+                            clean_count: 0,
                         })
                     }
                 }

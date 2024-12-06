@@ -27,5 +27,5 @@ def update_json_line_no(filename, line_no):
 
 for i in range(2,3):
     update_json_line_no('config.json', i)
-    for _ in range(20):
+    for _ in range(50):
         subprocess.run(['cargo', 'run'])
